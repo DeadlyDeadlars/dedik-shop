@@ -14,11 +14,15 @@ class Database:
         return self._dsn.startswith("sqlite:///") or self._dsn.endswith(".db")
 
     def _sqlite_path(self) -> str:
-        if self._dsn.startswith("sqlite///"):
-            return self._dsn[len("sqlite:///"):]
-        if self._dsn.startswith("sqlite://"):
-            return self._dsn[len("sqlite://"):]
-        return self._dsn
+        # Resolve DSN to a filesystem path relative to project root (python-bot)
+        if self._dsn.startswith("sqlite:///"):
+            raw = self._dsn[len("sqlite///"):]
+        elif self._dsn.startswith("sqlite://"):
+            raw = self._dsn[len("sqlite://"):]
+        else:
+            raw = self._dsn
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return raw if os.path.isabs(raw) else os.path.join(base_dir, raw)
 
     def _adapt_query(self, query: str):
         # Convert $1, $2 ... to ? placeholders for sqlite
@@ -30,7 +34,9 @@ class Database:
     async def connect(self):
         if self._is_sqlite():
             path = self._sqlite_path()
-            os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+            dir_name = os.path.dirname(path)
+            if dir_name and not os.path.exists(dir_name):
+                os.makedirs(dir_name, exist_ok=True)
             self._sqlite = await aiosqlite.connect(path)
             await self._sqlite.execute("PRAGMA foreign_keys = ON;")
         else:
@@ -80,7 +86,8 @@ class Database:
 
     async def ensure_schema(self):
         if self._sqlite:
-            await self.execute(
+            # Use executescript to run multiple SQL statements at once
+            await self._sqlite.executescript(
                 """
                 create table if not exists users (
                   id integer primary key autoincrement,
@@ -103,8 +110,17 @@ class Database:
                   invoice_id integer,
                   created_at text default (datetime('now'))
                 );
+                create table if not exists user_active_promocodes (
+                  id integer primary key autoincrement,
+                  user_id integer references users(id) on delete cascade,
+                  promo_code text not null,
+                  discount_percent integer not null,
+                  min_amount integer default 0,
+                  created_at text default (datetime('now'))
+                );
                 """
             )
+            await self._sqlite.commit()
             return
         await self.execute(
             """
@@ -127,6 +143,14 @@ class Database:
               tariff_id int references tariffs(id) on delete set null,
               status varchar(32) default 'created',
               invoice_id bigint,
+              created_at timestamp default now()
+            );
+            create table if not exists user_active_promocodes (
+              id serial primary key,
+              user_id int references users(id) on delete cascade,
+              promo_code varchar(255) not null,
+              discount_percent integer not null,
+              min_amount integer default 0,
               created_at timestamp default now()
             );
             """

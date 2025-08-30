@@ -17,11 +17,13 @@ class Tariffs:
         return await self.db.fetch("select * from tariffs order by location, price")
 
     async def create(self, location: str, specs: str, price: float):
+        # Ensure SQLite gets a native float
+        price_val = float(price)
         return await self.db.fetchrow(
             "insert into tariffs(location,specs,price) values($1,$2,$3) returning *",
             location,
             specs,
-            price,
+            price_val,
         )
 
 
@@ -62,7 +64,24 @@ class Orders:
         return await self.db.fetchrow("select * from orders where invoice_id=$1", invoice_id)
 
     async def set_status(self, order_id: int, status: str):
-        return await self.db.fetchrow("update orders set status=$2 where id=$1 returning *", order_id, status)
+        updated = await self.db.fetchrow("update orders set status=$2 where id=$1 returning *", order_id, status)
+        if not updated:
+            await self.db.execute("update orders set status=$2 where id=$1", order_id, status)
+            # fetch full joined row
+            updated = await self.with_user_by_id(order_id)
+        return updated
+
+    async def with_user_by_id(self, order_id: int):
+        return await self.db.fetchrow(
+            """
+            select o.*, u.telegram_id, u.username, t.location, t.specs, t.price
+            from orders o
+            left join users u on u.id = o.user_id
+            left join tariffs t on t.id = o.tariff_id
+            where o.id=$1
+            """,
+            order_id,
+        )
 
     async def with_user_by_invoice(self, invoice_id: int):
         return await self.db.fetchrow(

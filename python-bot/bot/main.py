@@ -34,6 +34,9 @@ async def main():
         "cryptobot": cryptobot,
         "admin_ids": settings.admin_ids,
         "rub_usdt_rate": settings.rub_usdt_rate,
+        "price_markup_percent": settings.price_markup_percent,
+        "log_channel_id": settings.log_channel_id,
+        "support_contact": settings.support_contact,
     }
     setup_handlers(dp, services)
 
@@ -45,7 +48,24 @@ async def main():
     site = web.TCPSite(runner, host="0.0.0.0", port=int(__import__('os').getenv('PORT', '8080')))
     await site.start()
 
-    await dp.start_polling(bot)
+    try:
+        await dp.start_polling(bot)
+    except KeyboardInterrupt:
+        # Graceful shutdown on Ctrl+C
+        pass
+    finally:
+        try:
+            await db.close()
+        except Exception:
+            pass
+        try:
+            await runner.cleanup()
+        except Exception:
+            pass
+        try:
+            await bot.session.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

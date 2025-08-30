@@ -56,4 +56,23 @@ class CryptoBot:
             raise RuntimeError("RUB→USDT rate not available")
         return amount_rub * rate
 
+    async def get_invoice(self, invoice_id: int):
+        headers = {
+            "Content-Type": "application/json",
+            "Crypto-Pay-API-Token": self._token,
+        }
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{self._base}/getInvoices",
+                headers=headers,
+                json={"invoice_ids": [invoice_id]},
+                timeout=20,
+            )
+            r.raise_for_status()
+            j = r.json()
+            if not j.get("ok"):
+                raise RuntimeError("CryptoBot API error")
+            items = j.get("result") or []
+            return items[0] if items else None
+
 

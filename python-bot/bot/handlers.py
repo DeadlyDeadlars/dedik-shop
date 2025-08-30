@@ -909,17 +909,17 @@ def setup_handlers(router: Router, services):
                 loc,
                 specs,
             )
-        if existing:
-            if float(existing["price"]) != float(price):
-                await db.execute(
-                    "update tariffs set price=$1 where id=$2",
-                    float(price),
-                    existing["id"],
-                )
-                updated_count += 1
-        else:
-            await tariffs.create(loc, specs, float(price))
-            added += 1
+            if existing:
+                if float(existing["price"]) != float(price):
+                    await db.execute(
+                        "update tariffs set price=$1 where id=$2",
+                        float(price),
+                        existing["id"],
+                    )
+                    updated_count += 1
+            else:
+                await tariffs.create(loc, specs, float(price))
+                added += 1
         await msg.answer(f"Готово. Добавлено: {added}, обновлено цен: {updated_count}")
     
     # Команда для инициализации новых таблиц

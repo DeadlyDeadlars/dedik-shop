@@ -19,12 +19,13 @@ class Tariffs:
     async def create(self, location: str, specs: str, price: float):
         # Ensure SQLite gets a native float
         price_val = float(price)
-        return await self.db.fetchrow(
-            "insert into tariffs(location,specs,price) values($1,$2,$3) returning *",
+        await self.db.execute(
+            "insert into tariffs(location,specs,price) values($1,$2,$3)",
             location,
             specs,
             price_val,
         )
+        return await self.db.fetchrow("select * from tariffs where location=$1 and specs=$2 and price=$3", location, specs, price_val)
 
 
 class Users:
@@ -35,11 +36,12 @@ class Users:
         row = await self.db.fetchrow("select * from users where telegram_id=$1", telegram_id)
         if row:
             return row
-        return await self.db.fetchrow(
-            "insert into users(username, telegram_id) values($1,$2) returning *",
+        await self.db.execute(
+            "insert into users(username, telegram_id) values($1,$2)",
             username,
             telegram_id,
         )
+        return await self.db.fetchrow("select * from users where telegram_id=$1", telegram_id)
 
 
 class Orders:
@@ -47,12 +49,13 @@ class Orders:
         self.db = db
 
     async def create(self, user_id: int, tariff_id: int, invoice_id: int | None):
-        return await self.db.fetchrow(
-            "insert into orders(user_id, tariff_id, status, invoice_id) values($1,$2,'created',$3) returning *",
+        await self.db.execute(
+            "insert into orders(user_id, tariff_id, status, invoice_id) values($1,$2,'created',$3)",
             user_id,
             tariff_id,
             invoice_id,
         )
+        return await self.db.fetchrow("select * from orders where user_id=$1 and tariff_id=$2 and invoice_id=$3", user_id, tariff_id, invoice_id)
 
     async def by_user(self, user_id: int):
         return await self.db.fetch(
@@ -64,12 +67,8 @@ class Orders:
         return await self.db.fetchrow("select * from orders where invoice_id=$1", invoice_id)
 
     async def set_status(self, order_id: int, status: str):
-        updated = await self.db.fetchrow("update orders set status=$2 where id=$1 returning *", order_id, status)
-        if not updated:
-            await self.db.execute("update orders set status=$2 where id=$1", order_id, status)
-            # fetch full joined row
-            updated = await self.with_user_by_id(order_id)
-        return updated
+        await self.db.execute("update orders set status=$2 where id=$1", order_id, status)
+        return await self.with_user_by_id(order_id)
 
     async def with_user_by_id(self, order_id: int):
         return await self.db.fetchrow(

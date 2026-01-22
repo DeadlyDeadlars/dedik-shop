@@ -119,6 +119,29 @@ class Database:
                   min_amount integer default 0,
                   created_at text default (datetime('now'))
                 );
+                create table if not exists referral_rewards (
+                  id integer primary key autoincrement,
+                  referrer_id integer references users(id),
+                  referred_user_id integer references users(id),
+                  order_id integer references orders(id),
+                  reward_amount integer not null,
+                  created_at text default (datetime('now'))
+                );
+                create table if not exists promocodes (
+                  id integer primary key autoincrement,
+                  code text unique not null,
+                  discount_percent integer not null,
+                  min_amount integer default 0,
+                  max_uses integer default 0,
+                  used_count integer default 0,
+                  is_active integer default 1,
+                  created_at text default (datetime('now'))
+                );
+                create table if not exists settings (
+                  key text primary key,
+                  value text not null,
+                  updated_at text default (datetime('now'))
+                );
                 """
             )
             # Add referrer_id column if it doesn't exist (migration)

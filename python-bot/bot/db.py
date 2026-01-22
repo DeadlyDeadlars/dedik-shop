@@ -94,6 +94,7 @@ class Database:
                   username text,
                   telegram_id integer,
                   role text default 'user',
+                  referrer_id integer,
                   created_at text default (datetime('now'))
                 );
                 create table if not exists tariffs (
@@ -120,6 +121,11 @@ class Database:
                 );
                 """
             )
+            # Add referrer_id column if it doesn't exist (migration)
+            try:
+                await self._sqlite.execute("ALTER TABLE users ADD COLUMN referrer_id integer")
+            except:
+                pass  # Column already exists
             await self._sqlite.commit()
             return
         await self.execute(

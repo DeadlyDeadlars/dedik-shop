@@ -922,6 +922,34 @@ def setup_handlers(router: Router, services):
                 added += 1
         await msg.answer(f"Готово. Добавлено: {added}, обновлено цен: {updated_count}")
     
+    # Команда для добавления отдельного сервера
+    @router.message(F.text.startswith("/add_server"))
+    async def add_server(msg: types.Message):
+        if msg.from_user.id not in admin_ids:
+            return await msg.answer("Недостаточно прав.")
+        
+        try:
+            # Формат: /add_server Россия|4 Gb RAM / 2 Core CPU / SSD 40 Gb|650
+            parts = msg.text.replace("/add_server ", "").split("|")
+            if len(parts) != 3:
+                return await msg.answer(
+                    "Неверный формат. Используйте:\n"
+                    "/add_server Локация|Характеристики|Цена\n\n"
+                    "Пример:\n"
+                    "/add_server Россия|4 Gb RAM / 2 Core CPU / SSD 40 Gb|650"
+                )
+            
+            location, specs, price = [p.strip() for p in parts]
+            price_float = float(price)
+            
+            await tariffs.create(location, specs, price_float)
+            await msg.answer(f"✅ Сервер добавлен:\n{location} • {specs} • {price} RUB")
+            
+        except ValueError:
+            await msg.answer("Ошибка: цена должна быть числом")
+        except Exception as e:
+            await msg.answer(f"Ошибка при добавлении: {e}")
+    
     # Команда для инициализации новых таблиц
     @router.message(F.text == "/init_db")
     async def init_database(msg: types.Message):
